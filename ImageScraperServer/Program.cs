@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Threading;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
@@ -31,9 +32,18 @@ namespace ImageScraperServer
             string source = null;
             IWebDriver driver = null;
 
-            try
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                driver = new ChromeDriver("/var/www/pixtopost/");
+            }
+            else
             {
                 driver = new ChromeDriver();
+            }
+
+            try
+            {
+                
                 driver.Navigate().GoToUrl(url);
                 Thread.Sleep(500);
                 source = driver.PageSource;
