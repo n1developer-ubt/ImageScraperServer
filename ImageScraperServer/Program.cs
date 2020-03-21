@@ -60,6 +60,7 @@ namespace ImageScraperServer
 
             byte[] byData = System.Text.Encoding.ASCII.GetBytes(source);
             socket.Send(System.Text.Encoding.ASCII.GetBytes(byData.Length.ToString()));
+            GetString(socket);
             socket.Send(byData);
             socket.Close();
             GC.Collect();
