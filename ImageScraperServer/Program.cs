@@ -1,7 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
+using HtmlAgilityPack;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 
@@ -28,6 +32,17 @@ namespace ImageScraperServer
         {
 
             string url = GetString(socket);
+            try
+            {
+                new Uri(url);
+            }
+            catch (Exception e)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                socket.Close();
+                return;
+            }
             Console.WriteLine(url);
             string source = null;
             IWebDriver driver = null;
@@ -58,11 +73,18 @@ namespace ImageScraperServer
                 driver?.Dispose();
             }
 
-            byte[] byData = System.Text.Encoding.ASCII.GetBytes(source);
-            socket.Send(System.Text.Encoding.ASCII.GetBytes(byData.Length.ToString()));
-            GetString(socket);
-            socket.Send(byData);
-            socket.Close();
+            try
+            {
+                byte[] byData = Encoding.ASCII.GetBytes(GetLinks(source,url).Trim());
+                socket.Send(Encoding.ASCII.GetBytes(byData.Length.ToString()));
+                GetString(socket);
+                socket.Send(byData);
+                socket.Close();
+            }
+            catch (Exception e)
+            {
+                
+            }
             GC.Collect();
             GC.WaitForPendingFinalizers();
             try
@@ -75,6 +97,62 @@ namespace ImageScraperServer
             }
         }
 
+        private static string GetLinks(string source, string website)
+        {
+            HtmlDocument document = new HtmlDocument();
+            document.LoadHtml(source);
+            string toReturn = "";
+            foreach (HtmlNode link in document.DocumentNode.SelectNodes("//img"))
+            {
+                string url = link.GetAttributeValue("src", "nothing").Replace("\u0022", "");
+                if (!UrlExist(url))
+                {
+                    url = (website[^1] == '/' ? website : website + "/") + url;
+                    if (!UrlExist(url)) url = null;
+                }
+
+                if (url == null)
+                    continue;
+                toReturn += url + "\n";
+            }
+
+            return toReturn;
+        }
+
+        private static bool UrlExist(string path)
+        {
+            HttpWebResponse response = null;
+            HttpWebRequest request = null;
+            try
+            {
+                request = (HttpWebRequest)WebRequest.Create(path);
+            }
+            catch (Exception e)
+            {
+                return false;
+            }
+            request.Method = "HEAD";
+            bool result = false;
+            try
+            {
+                response = (HttpWebResponse)request.GetResponse();
+                result = true;
+            }
+            catch (WebException ex)
+            {
+                /* A WebException will be thrown if the status of the response is not `200 OK` */
+            }
+            finally
+            {
+                // Don't forget to close your response.
+                if (response != null)
+                {
+                    response.Close();
+                }
+            }
+
+            return result;
+        }
         private static string GetString(Socket socket)
         {
             byte[] buffer = new byte[1024];
